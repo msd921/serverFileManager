@@ -1,8 +1,9 @@
 ﻿# Устанавливаем минимальную версию CMake и название проекта
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.20)
 project(serverFileManager)
+cmake_policy(SET CMP0074 NEW)
 
-# Устанавливаем стандарт C++20, если поддерживается
+# Устанавливаем стандарт C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -12,10 +13,25 @@ if(POLICY CMP0141)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-# Добавляем Boost, если он нужен
-set(BOOST_ROOT "C:/Program Files/boost/boost_1_86_0")
-find_package(Boost REQUIRED COMPONENTS system)
-include_directories(${Boost_INCLUDE_DIRS})
+# Добавляем Boost
+#set(BOOST_INCLUDEDIR "${BOOST_ROOT}")
+#set(BOOST_LIBRARYDIR "${BOOST_ROOT}/stage/lib")
+find_package(Boost REQUIRED COMPONENTS system filesystem)
+
+#include_directories(${Boost_INCLUDE_DIRS})
+
+if(Boost_FOUND)
+    message(STATUS "Boost found!")
+    message(STATUS "Boost include dir: ${Boost_INCLUDE_DIRS}")
+    message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
+    include_directories(${Boost_INCLUDE_DIRS})
+    link_directories(${Boost_LIBRARYDIR})
+else()
+    message(FATAL_ERROR "Boost not found. Please verify BOOST_ROOT path and Boost installation.")
+endif()
+
+#target_link_libraries(serverFileManager Boost::headers)
+
 
 include_directories(include)
 
@@ -29,3 +45,10 @@ add_executable(serverFileManager
 
 # Линкуем библиотеки
 target_link_libraries(serverFileManager ${Boost_LIBRARIES})
+#message(STATUS "Boost_INCLUDE_DIRS: ${Boost_INCLUDE_DIRS}")
+#link_directories(${Boost_LIBRARY_DIR})
+#target_link_libraries(serverFileManager Boost::headers)
+
+#message(STATUS "Boost include dir: ${Boost_INCLUDE_DIRS}")
+#message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
+message(STATUS "Boost library dir: ${Boost_LIBRARY_DIRS}")

@@ -3,6 +3,7 @@
 
 .vs/
 out/
+vcpkg_installed/
 
 # Compiled Object files
 *.slo
