@@ -13,6 +13,9 @@ if(POLICY CMP0141)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
+# Установка _WIN32_WINNT для поддержки Windows 10
+add_definitions(-D_WIN32_WINNT=0x0A00)
+
 # Добавляем Boost
 #set(BOOST_INCLUDEDIR "${BOOST_ROOT}")
 #set(BOOST_LIBRARYDIR "${BOOST_ROOT}/stage/lib")
