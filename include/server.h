@@ -7,8 +7,6 @@
 
 
 using boost::asio::ip::tcp;
-typedef boost::shared_ptr< boost::asio::ip::tcp::socket> socket_ptr;
-//typedef std::shared_ptr<tcp_connection> pointer;
 
 class tcp_connection : public std::enable_shared_from_this<tcp_connection>
 {
@@ -22,11 +20,22 @@ public:
     void start();
 private:
     tcp_connection(boost::asio::io_context& io_context);
-    void handle_write(const boost::system::error_code& /*error*/,
-        size_t /*bytes_transferred*/);
+   
+    void read_command();
+    void handle_read(const boost::system::error_code& error, std::size_t bytes_transferred/*, boost::asio::streambuf* buffer_ptr*/);
+    void handle_command(const std::string& command);
+    
+
+    void send_file_list();
+    void send_file(const std::string& filename);
+    //void receive_file();
+    void send_error_message(const std::string& error_message);
+
+    void log_socket_state(const std::string& context);
 
     tcp::socket socket_;
     std::string message_;
+    boost::asio::streambuf buffer_;
 };
 
 using boost::asio::ip::tcp;
@@ -43,9 +52,3 @@ private:
     boost::asio::io_context& io_context_;
     boost::asio::ip::tcp::acceptor acceptor_;
 };
-
-
-std::string make_daytime_string();
-
-
-

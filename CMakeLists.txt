@@ -41,10 +41,11 @@ include_directories(include)
 # Определяем исполняемый файл и включаем исходные файлы
 add_executable(serverFileManager 
     src/main.cpp 
-    src/server.cpp 
+    src/server.cpp
+    src/commands.cpp
     include/server.h 
     include/serverFileManager.h
-)
+    include/commands.h)
 
 # Линкуем библиотеки
 target_link_libraries(serverFileManager ${Boost_LIBRARIES})
