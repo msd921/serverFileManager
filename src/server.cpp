@@ -123,6 +123,20 @@ void tcp_connection::handle_command(const std::string& command)
 		send_error_message("Unknown command");
 		break;
 	}
+	send_end_of_transfer();
+}
+
+void tcp_connection::send_end_of_transfer()
+{
+	auto end_of_transfer_ptr = std::make_shared<std::string>("\nEND\n");
+
+	auto self = shared_from_this();
+	boost::asio::async_write(socket_, boost::asio::buffer(*end_of_transfer_ptr),
+		[self, end_of_transfer_ptr](const boost::system::error_code& error, std::size_t bytes_transferred) {
+			if (error) {
+				std::cerr << "Ошибка при отправке сообщения об ошибке: " << error.message() << std::endl;
+			}
+		});
 }
 
 void tcp_connection::send_file_list()
@@ -167,7 +181,7 @@ void tcp_connection::send_file(const std::string& filename) {
 
 	// Лямбда для отправки следующего блока
 	auto send_next_block = std::make_shared<std::function<void()>>();
-	*send_next_block = [self, file_ptr, buffer, send_next_block]() { 
+	*send_next_block = [self, file_ptr, buffer, send_next_block]() {
 		if (!file_ptr->eof()) {
 			file_ptr->read(buffer->data(), buffer->size());
 			std::size_t bytes_read = file_ptr->gcount(); // Сколько байт было прочитано

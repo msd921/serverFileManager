@@ -17,11 +17,7 @@ endif()
 add_definitions(-D_WIN32_WINNT=0x0A00)
 
 # Добавляем Boost
-#set(BOOST_INCLUDEDIR "${BOOST_ROOT}")
-#set(BOOST_LIBRARYDIR "${BOOST_ROOT}/stage/lib")
 find_package(Boost REQUIRED COMPONENTS system filesystem)
-
-#include_directories(${Boost_INCLUDE_DIRS})
 
 if(Boost_FOUND)
     message(STATUS "Boost found!")
@@ -32,9 +28,6 @@ if(Boost_FOUND)
 else()
     message(FATAL_ERROR "Boost not found. Please verify BOOST_ROOT path and Boost installation.")
 endif()
-
-#target_link_libraries(serverFileManager Boost::headers)
-
 
 include_directories(include)
 
@@ -49,10 +42,5 @@ add_executable(serverFileManager
 
 # Линкуем библиотеки
 target_link_libraries(serverFileManager ${Boost_LIBRARIES})
-#message(STATUS "Boost_INCLUDE_DIRS: ${Boost_INCLUDE_DIRS}")
-#link_directories(${Boost_LIBRARY_DIR})
-#target_link_libraries(serverFileManager Boost::headers)
 
-#message(STATUS "Boost include dir: ${Boost_INCLUDE_DIRS}")
-#message(STATUS "Boost libraries: ${Boost_LIBRARIES}")
-message(STATUS "Boost library dir: ${Boost_LIBRARY_DIRS}")
+#message(STATUS "Boost library dir: ${Boost_LIBRARY_DIRS}")

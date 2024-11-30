@@ -8,6 +8,8 @@
 
 using boost::asio::ip::tcp;
 
+//namespace fs = boost::filesystem;
+
 class tcp_connection : public std::enable_shared_from_this<tcp_connection>
 {
 public:
@@ -25,6 +27,7 @@ private:
     void handle_read(const boost::system::error_code& error, std::size_t bytes_transferred/*, boost::asio::streambuf* buffer_ptr*/);
     void handle_command(const std::string& command);
     
+    void send_end_of_transfer();
 
     void send_file_list();
     void send_file(const std::string& filename);
@@ -38,8 +41,7 @@ private:
     boost::asio::streambuf buffer_;
 };
 
-using boost::asio::ip::tcp;
-namespace fs = boost::filesystem;
+
 class FileServer {
 public:
     FileServer(boost::asio::io_context& io_context, short port);
