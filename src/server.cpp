@@ -30,21 +30,17 @@ tcp_connection::tcp_connection(boost::asio::io_context& io_context)
 
 void tcp_connection::read_command()
 {
-
 	auto self = shared_from_this();
-	log_socket_state("Вызов перед async_read_until");
-	std::cout << (boost::asio::buffer_cast<const char*>(buffer_.data()), buffer_.size()) << std::endl;
 
 	boost::asio::async_read_until(socket_, buffer_, '\n',
 		[this, self](const boost::system::error_code& error, std::size_t bytes_transferred) {
 			handle_read(error, bytes_transferred);
 		});
-	log_socket_state("Вызов после async_read_until");
 }
 
 void tcp_connection::handle_read(const boost::system::error_code& error, std::size_t bytes_transferred/*, boost::asio::streambuf* buffer_ptr*/)
 {
-	std::cout << "[DEBUG] Вызов async_read_until завершен. Ошибка: " << error.message() << std::endl;
+	//std::cout << "[DEBUG] Вызов async_read_until завершен. Ошибка: " << error.message() << std::endl;
 	if (!error) {
 		try {
 			// Проверяем, что в буфере есть данные
@@ -67,8 +63,10 @@ void tcp_connection::handle_read(const boost::system::error_code& error, std::si
 
 				// Обработка команды
 				handle_command(command_copy);
-				// Продолжаем читать следующую команду
-				read_command();
+				// Продолжаем читать следующую 
+				if (!is_uploading_file) {
+					read_command();
+				}
 			}
 			else {
 				std::cerr << "Буфер пуст, пропускаем обработку" << std::endl;
@@ -112,18 +110,27 @@ void tcp_connection::handle_command(const std::string& command)
 		break;
 
 	case CommandType::UploadFile:
-		std::cout << "Команда: UPLOAD - Получение файла от клиента" << std::endl;
-		//  пока отключено
-		//receive_file(); 
+		space_pos = command.find_last_of(' ');
+		if (space_pos == std::string::npos || space_pos + 1 >= command.size()) {
+			send_error_message("Invalid UPLOAD command format");
+		}
+		else {
+			std::size_t size_str_upload = std::size("UPLOAD");
+			std::string new_filename = command.substr(size_str_upload, space_pos - size_str_upload);
+			std::size_t file_size = std::stoull(command.substr(space_pos + 1));
+			std::cout << "Прием файла " << new_filename << ", размер: " << file_size << " байт" << std::endl;
+			is_uploading_file = true;
+			receive_file(new_filename, file_size); // Начинаем прием
+		}
 		break;
 
 	case CommandType::Invalid:
 	default:
 		std::cerr << "Неизвестная команда: " << command << std::endl;
 		send_error_message("Unknown command");
+		read_command();
 		break;
 	}
-	send_end_of_transfer();
 }
 
 void tcp_connection::send_end_of_transfer()
@@ -161,6 +168,7 @@ void tcp_connection::send_file_list()
 				if (error) {
 					std::cerr << "Ошибка отправки списка файлов: " << error.message() << std::endl;
 				}
+				self->send_end_of_transfer();
 			});
 	}
 	catch (const std::exception& e) {
@@ -199,11 +207,86 @@ void tcp_connection::send_file(const std::string& filename) {
 		}
 		else {
 			std::cout << "Файл успешно отправлен!" << std::endl;
+			self->send_end_of_transfer();
 		}
 		};
 
 	// Начинаем отправку
 	(*send_next_block)();
+}
+
+void tcp_connection::receive_file(const std::string& filename, std::size_t file_size)
+{
+	auto file_ptr = std::make_shared<std::ofstream>(filename, std::ios::binary);
+	if (!file_ptr->is_open()) {
+		send_error_message("Failed to open file for writing");
+		return;
+	}
+
+	auto end_of_transfer_ptr = std::make_shared<std::string>("READY\n");
+	auto self = shared_from_this();
+	boost::asio::async_write(socket_, boost::asio::buffer(*end_of_transfer_ptr),
+		[self, end_of_transfer_ptr](const boost::system::error_code& error, std::size_t bytes_transferred) {
+			if (error) {
+				std::cerr << "Ошибка при отправке готовности к приему: " << error.message() << std::endl;
+				return;
+			}
+		});
+
+	auto buffer = std::make_shared<std::vector<char>>(1024); 
+	//auto self = shared_from_this();
+	auto bytes_received = std::make_shared<std::size_t>(0);  // Отслеживаем объем принятых данных
+
+	// Лямбда для чтения данных из сокета
+	auto receive_next_block = std::make_shared<std::function<void()>>();
+	*receive_next_block = [self, file_ptr, buffer, bytes_received, file_size, receive_next_block]() {
+		self->socket_.async_read_some(boost::asio::buffer(*buffer),
+			[self, file_ptr, buffer, bytes_received, file_size, receive_next_block](const boost::system::error_code& error, std::size_t bytes_transferred) {
+				if (!error) {
+					// Увеличиваем счетчик принятых байтов
+					*bytes_received += bytes_transferred;
+
+					// Записываем данные в файл
+					file_ptr->write(buffer->data(), bytes_transferred);
+					if (file_ptr->fail()) {
+						self->send_error_message("Failed to write to file");
+						return;
+					}
+
+					std::cout << "Принято: " << bytes_transferred << " байт, всего: " << *bytes_received << "/" << file_size << std::endl;
+
+					// Проверяем, достигли ли ожидаемого размера файла
+					if (*bytes_received >= file_size) {
+						std::cout << "Прием файла завершен!" << std::endl;
+						file_ptr->close();
+						self->send_end_of_transfer();
+						self->is_uploading_file = false;
+						self->read_command();
+					}
+					else {
+						(*receive_next_block)(); // Читаем следующую часть
+					}
+				}
+				else if (error == boost::asio::error::eof) {
+					std::cout << "Передача файла завершена досрочно!" << std::endl;
+					file_ptr->close();
+					self->send_end_of_transfer();
+					self->is_uploading_file = false;
+					self->read_command();
+				}
+				else {
+					std::cerr << "Ошибка приема файла: " << error.message() << std::endl;
+					file_ptr->close();
+					self->send_error_message("File transfer error");
+					self->is_uploading_file = false;
+					self->read_command();
+				}
+			});
+		};
+
+	// Начинаем прием данных
+	(*receive_next_block)();
+
 }
 
 void tcp_connection::send_error_message(const std::string& error_message) {
@@ -218,6 +301,7 @@ void tcp_connection::send_error_message(const std::string& error_message) {
 			}
 			else {
 				std::cout << "Сообщение об ошибке отправлено (" << bytes_transferred << " байт)." << std::endl;
+				self->send_end_of_transfer();
 			}
 		});
 }

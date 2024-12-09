@@ -31,7 +31,7 @@ private:
 
     void send_file_list();
     void send_file(const std::string& filename);
-    //void receive_file();
+    void receive_file(const std::string& filename, std::size_t file_size);
     void send_error_message(const std::string& error_message);
 
     void log_socket_state(const std::string& context);
@@ -39,6 +39,8 @@ private:
     tcp::socket socket_;
     std::string message_;
     boost::asio::streambuf buffer_;
+
+    bool is_uploading_file = false; //  предотвращает добавление в очередь лишних async_read 
 };
 
 
