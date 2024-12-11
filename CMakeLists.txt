@@ -36,9 +36,10 @@ add_executable(serverFileManager
     src/main.cpp 
     src/server.cpp
     src/commands.cpp
+    src/file_manager.cpp
     include/server.h 
-    include/serverFileManager.h
-    include/commands.h)
+    include/file_manager.h
+    include/commands.h )
 
 # Линкуем библиотеки
 target_link_libraries(serverFileManager ${Boost_LIBRARIES})
