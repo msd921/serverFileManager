@@ -130,7 +130,6 @@ void tcp_connection::handle_command(const std::string& command)
 	default:
 		std::cerr << "Неизвестная команда: " << command << std::endl;
 		send_error_message("Unknown command");
-		read_command();
 		break;
 	}
 }
@@ -180,8 +179,18 @@ void tcp_connection::send_file(const std::string& filename) {
 		send_error_message("file not found");
 		return;
 	}
+
+	auto file_info_ptr = std::make_shared<std::string>(filename + " " + std::to_string(file_manager_->get_file_size(filename)) + "\n");
 	auto self = shared_from_this();
-	const std::size_t chunk_size = 1024; // Размер блока 
+	boost::asio::async_write(socket_, boost::asio::buffer(*file_info_ptr),
+		[self, file_info_ptr](const boost::system::error_code& error, std::size_t bytes_transferred) {
+			if (error) {
+				std::cerr << "Ошибка при отправке готовности к приему: " << error.message() << std::endl;
+				return;
+			}
+		});
+	
+	const std::size_t chunk_size = 1024 * 1024; // Размер блока 
 
 	auto filename_ptr = std::make_shared<std::string>(filename);
 
@@ -194,40 +203,47 @@ void tcp_connection::send_file(const std::string& filename) {
 			// Буфер для хранения данных текущего блока
 
 			std::ostringstream buffer_stream;
-
+			;
+			// Выполняем операцию
+			
 			// Читаем следующую часть файла
 			self->file_manager_->read_from_file(filename_ptr.get()->c_str(), buffer_stream, *current_position, chunk_size);
-
+			
 			// Извлекаем данные в строку
 			*chunk_data = buffer_stream.str();
 			if (chunk_data->empty()) {
 				// Все данные отправлены
 				std::cout << "Файл полностью отправлен!" << std::endl;
+				self->file_manager_->close_file();
 				self->send_end_of_transfer();
 				//self->notify_end_of_transfer();
 				return;
 			}
 
 			*current_position += chunk_data->size(); // Обновляем текущую позицию
-
+			auto start = std::make_shared<std::chrono::steady_clock::time_point>(std::chrono::steady_clock::now());
 			// Отправляем данные через сокет
 			boost::asio::async_write(
 				self->socket_,
 				boost::asio::buffer(*chunk_data),
-				[self, send_next_chunk](const boost::system::error_code& error, std::size_t bytes_transferred) {
+				[self, send_next_chunk, start](const boost::system::error_code& error, std::size_t bytes_transferred) {
 					if (error) {
 						std::cerr << "Ошибка при отправке данных: " << error.message() << std::endl;
 						self->send_end_of_transfer();
 						return;
 					}
 					std::cout << "Отправлено: " << bytes_transferred << " байт." << std::endl;
-
+					auto end = std::chrono::steady_clock::now();
+					std::cout << "Время отправки блока: "
+						<< std::chrono::duration_cast<std::chrono::milliseconds>(end - *start).count()
+						<< " мс, байт: " << bytes_transferred << "\n";
 					// Отправляем следующий блок
 					(*send_next_chunk)();
 				}
 			);
 		}
 		catch (const std::exception& e) {
+			self->file_manager_->close_file();
 			std::cerr << "Ошибка при чтении или отправке данных: " << e.what() << std::endl;
 		}
 		};
@@ -240,17 +256,17 @@ void tcp_connection::receive_file(const std::string& filename, std::size_t file_
 {
 	std::string new_filename;
 	try {
-		new_filename = file_manager_->write_to_file(filename, "", false);
+		new_filename = file_manager_->create_file(filename, false);
 	}
 	catch (const std::runtime_error& e) {
 		send_error_message("Failed to open file for writing");
 		return;
 	}
 
-	auto end_of_transfer_ptr = std::make_shared<std::string>("READY\n");
+	auto ready_to_transfer_ptr = std::make_shared<std::string>("READY\n");
 	auto self = shared_from_this();
-	boost::asio::async_write(socket_, boost::asio::buffer(*end_of_transfer_ptr),
-		[self, end_of_transfer_ptr](const boost::system::error_code& error, std::size_t bytes_transferred) {
+	boost::asio::async_write(socket_, boost::asio::buffer(*ready_to_transfer_ptr),
+		[self, ready_to_transfer_ptr](const boost::system::error_code& error, std::size_t bytes_transferred) {
 			if (error) {
 				std::cerr << "Ошибка при отправке готовности к приему: " << error.message() << std::endl;
 				return;
@@ -258,7 +274,7 @@ void tcp_connection::receive_file(const std::string& filename, std::size_t file_
 		});
 
 	auto new_filename_ptr = std::make_shared<std::string>(new_filename);
-	auto buffer = std::make_shared<std::vector<char>>(1024);
+	auto buffer = std::make_shared<std::vector<char>>((1024*64));
 	//auto self = shared_from_this();
 	auto bytes_received = std::make_shared<std::size_t>(0);  // Отслеживаем объем принятых данных
 
@@ -272,12 +288,12 @@ void tcp_connection::receive_file(const std::string& filename, std::size_t file_
 					*bytes_received += bytes_transferred;
 					// Рассчитываем, сколько данных еще нужно принять
 					std::size_t bytes_to_write = std::min(bytes_transferred, file_size - *bytes_received + bytes_transferred);
-
-					// Создаем временный буфер с корректными данными
-					std::string valid_data(buffer->begin(), buffer->begin() + bytes_to_write);
+					
+					// Преобразуем данные в std::string для записи
+					std::string data_to_write(buffer->begin(), buffer->begin() + bytes_transferred);
 
 					// Записываем данные в файл
-					self->file_manager_->add_to_file(new_filename_ptr->c_str(), valid_data.c_str());
+					self->file_manager_->add_to_file(new_filename_ptr->c_str(), data_to_write);
 
 					// Записываем данные в файл
 					std::cout << "Принято: " << bytes_transferred << " байт, всего: " << *bytes_received << "/" << file_size << std::endl;
@@ -287,6 +303,7 @@ void tcp_connection::receive_file(const std::string& filename, std::size_t file_
 						if (*bytes_received > file_size) {
 							std::cout << "Ошибка - принялось байтов больше, чем должно быть!\n";
 						}
+						self->file_manager_->close_file();
 						std::cout << "Прием файла завершен!" << std::endl;
 						self->send_end_of_transfer();
 						self->is_uploading_file = false;
@@ -297,12 +314,14 @@ void tcp_connection::receive_file(const std::string& filename, std::size_t file_
 					}
 				}
 				else if (error == boost::asio::error::eof) {
+					self->file_manager_->close_file();
 					std::cout << "Передача файла завершена досрочно!" << std::endl;
 					self->send_end_of_transfer();
 					self->is_uploading_file = false;
 					self->read_command();
 				}
 				else {
+					self->file_manager_->close_file();
 					std::cerr << "Ошибка приема файла: " << error.message() << std::endl;
 					self->send_error_message("File transfer error");
 					self->is_uploading_file = false;
@@ -310,9 +329,13 @@ void tcp_connection::receive_file(const std::string& filename, std::size_t file_
 				}
 			});
 		};
-
-	// Начинаем прием данных
-	(*receive_next_block)();
+	if (is_uploading_file) {
+		// Начинаем прием данных
+		(*receive_next_block)();
+	}
+	else {
+		//read_command();
+	}
 
 }
 
