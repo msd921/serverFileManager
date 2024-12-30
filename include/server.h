@@ -2,6 +2,8 @@
 #include <boost/asio.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/filesystem.hpp>
+#include "file_manager.h"
+
 #define _WIN32_WINNT 0x0A00
 #pragma once
 
@@ -14,7 +16,7 @@ class tcp_connection : public std::enable_shared_from_this<tcp_connection>
 {
 public:
     typedef std::shared_ptr<tcp_connection> pointer;
-    static tcp_connection::pointer tcp_connection::create(boost::asio::io_context& io_context)
+    static pointer create(boost::asio::io_context& io_context)
     {
         return pointer(new tcp_connection(io_context));
     }
@@ -39,8 +41,9 @@ private:
     tcp::socket socket_;
     std::string message_;
     boost::asio::streambuf buffer_;
+    std::unique_ptr<FileHandler> file_manager_;
 
-    bool is_uploading_file = false; //  предотвращает добавление в очередь лишних async_read 
+    bool is_uploading_file = false; 
 };
 
 

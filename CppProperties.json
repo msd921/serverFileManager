@@ -1,21 +1,17 @@
 {
   "configurations": [
     {
-      "inheritEnvironments": [
-        "msvc_x64"
-      ],
-      "name": "x64-Debug",
+      "name": "Linux Debug",
       "includePath": [
-        "${env.INCLUDE}",
-        "${workspaceRoot}\\**"
+        "/usr/include/**",
+        "/usr/local/include/**",
+        "${workspaceRoot}/**"
       ],
       "defines": [
-        "WIN32",
-        "_DEBUG",
-        "UNICODE",
-        "_UNICODE"
+        "_DEBUG"
       ],
-      "intelliSenseMode": "windows-msvc-x64"
+      "compilerPath": "/usr/bin/g++",
+      "intelliSenseMode": "clang-x64"
     }
   ]
 }

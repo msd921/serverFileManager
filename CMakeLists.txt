@@ -13,9 +13,6 @@ if(POLICY CMP0141)
     set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-# Установка _WIN32_WINNT для поддержки Windows 10
-add_definitions(-D_WIN32_WINNT=0x0A00)
-
 # Добавляем Boost
 find_package(Boost REQUIRED COMPONENTS system filesystem)
 
@@ -36,9 +33,10 @@ add_executable(serverFileManager
     src/main.cpp 
     src/server.cpp
     src/commands.cpp
+    src/file_manager.cpp
     include/server.h 
-    include/serverFileManager.h
-    include/commands.h)
+    include/file_manager.h
+    include/commands.h )
 
 # Линкуем библиотеки
 target_link_libraries(serverFileManager ${Boost_LIBRARIES})

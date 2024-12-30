@@ -6,7 +6,7 @@ enum class CommandType {
     ListFiles,
     GetFile,
     UploadFile,
-    Invalid // Для неизвестных команд
+    Invalid // пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
 };
 
 CommandType parse_command(const std::string& command);

@@ -1,7 +1,6 @@
 ﻿// serverFileManager.cpp: определяет точку входа для приложения.
 //
 
-#include "serverFileManager.h"
 #include "server.h"
 #include <boost/asio.hpp>
 
@@ -12,11 +11,11 @@ using namespace std;
 
 int main()
 {
-    SetConsoleCP(1251);
-    SetConsoleOutputCP(1251);
+    //SetConsoleCP(1251);
+    //SetConsoleOutputCP(1251);
     try {
         boost::asio::io_context io_context;
-        FileServer server(io_context, 200);
+        FileServer server(io_context, 8000);
         io_context.run();
     }
     catch (std::exception& e)

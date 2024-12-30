@@ -4,6 +4,8 @@
 .vs/
 out/
 vcpkg_installed/
+build/
+.vscode/
 
 # Compiled Object files
 *.slo
